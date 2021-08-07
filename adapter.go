@@ -1,3 +1,4 @@
+// Copyright 2021 by ODW LTS. All Rights Reserved.
 // Copyright 2020 by Blank-Xu. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// This file file has been modified by ODW LTS to improve SQL Server support.
 
 package sqlxadapter
 
@@ -25,6 +28,9 @@ import (
 	"github.com/casbin/casbin/v2/persist"
 	"github.com/jmoiron/sqlx"
 )
+
+// dafaultSchemaName if schemaName == "", the Adapter will use the default schema.
+const defaultSchemaName = "dbo"
 
 // defaultTableName  if tableName == "", the Adapter will use this default table name.
 const defaultTableName = "casbin_rule"
@@ -47,9 +53,11 @@ type CasbinRule struct {
 // Adapter  define the sqlx adapter for Casbin.
 // It can load policy lines or save policy lines from sqlx connected database.
 type Adapter struct {
-	db        *sqlx.DB
-	ctx       context.Context
-	tableName string
+	db  *sqlx.DB
+	ctx context.Context
+
+	schemaName string
+	tableName  string
 
 	isFiltered bool
 
@@ -80,14 +88,14 @@ type Filter struct {
 // NewAdapter  the constructor for Adapter.
 // db should connected to database and controlled by user.
 // If tableName == "", the Adapter will automatically create a table named "casbin_rule".
-func NewAdapter(db *sqlx.DB, tableName string) (*Adapter, error) {
-	return NewAdapterContext(context.Background(), db, tableName)
+func NewAdapter(db *sqlx.DB, schemaName, tableName string) (*Adapter, error) {
+	return NewAdapterContext(context.Background(), db, schemaName, tableName)
 }
 
 // NewAdapterContext  the constructor for Adapter.
 // db should connected to database and controlled by user.
 // If tableName == "", the Adapter will automatically create a table named "casbin_rule".
-func NewAdapterContext(ctx context.Context, db *sqlx.DB, tableName string) (*Adapter, error) {
+func NewAdapterContext(ctx context.Context, db *sqlx.DB, schemaName, tableName string) (*Adapter, error) {
 	if db == nil {
 		return nil, errors.New("db is nil")
 	}
@@ -103,14 +111,19 @@ func NewAdapterContext(ctx context.Context, db *sqlx.DB, tableName string) (*Ada
 		return nil, errors.New("sqlxadapter: please checkout 'oracle' branch")
 	}
 
+	if schemaName == "" {
+		schemaName = defaultSchemaName
+	}
+
 	if tableName == "" {
 		tableName = defaultTableName
 	}
 
 	adapter := Adapter{
-		db:        db,
-		ctx:       ctx,
-		tableName: tableName,
+		db:         db,
+		ctx:        ctx,
+		schemaName: schemaName,
+		tableName:  tableName,
 	}
 
 	// generate different databases sql
@@ -127,37 +140,19 @@ func NewAdapterContext(ctx context.Context, db *sqlx.DB, tableName string) (*Ada
 
 // genSQL  generate sql based on db driver name.
 func (p *Adapter) genSQL() {
-	p.sqlCreateTable = fmt.Sprintf(sqlCreateTable, p.tableName)
-	p.sqlTruncateTable = fmt.Sprintf(sqlTruncateTable, p.tableName)
+	p.sqlCreateTable = fmt.Sprintf(sqlCreateTable, p.schemaName, p.tableName)
+	p.sqlTruncateTable = fmt.Sprintf(sqlTruncateTable, p.schemaName, p.tableName)
 
-	p.sqlIsTableExist = fmt.Sprintf(sqlIsTableExist, p.tableName)
+	p.sqlIsTableExist = fmt.Sprintf(sqlIsTableExist, p.schemaName, p.tableName)
 
-	p.sqlInsertRow = fmt.Sprintf(sqlInsertRow, p.tableName)
-	p.sqlUpdateRow = fmt.Sprintf(sqlUpdateRow, p.tableName)
-	p.sqlDeleteAll = fmt.Sprintf(sqlDeleteAll, p.tableName)
-	p.sqlDeleteRow = fmt.Sprintf(sqlDeleteRow, p.tableName)
-	p.sqlDeleteByArgs = fmt.Sprintf(sqlDeleteByArgs, p.tableName)
+	p.sqlInsertRow = fmt.Sprintf(sqlInsertRow, p.schemaName, p.tableName)
+	p.sqlUpdateRow = fmt.Sprintf(sqlUpdateRow, p.schemaName, p.tableName)
+	p.sqlDeleteAll = fmt.Sprintf(sqlDeleteAll, p.schemaName, p.tableName)
+	p.sqlDeleteRow = fmt.Sprintf(sqlDeleteRow, p.schemaName, p.tableName)
+	p.sqlDeleteByArgs = fmt.Sprintf(sqlDeleteByArgs, p.schemaName, p.tableName)
 
-	p.sqlSelectAll = fmt.Sprintf(sqlSelectAll, p.tableName)
-	p.sqlSelectWhere = fmt.Sprintf(sqlSelectWhere, p.tableName)
-
-	switch p.db.DriverName() {
-	case "postgres", "pgx", "pq-timeouts", "cloudsqlpostgres":
-		p.sqlCreateTable = fmt.Sprintf(sqlCreateTablePostgres, p.tableName)
-		p.sqlInsertRow = fmt.Sprintf(sqlInsertRowPostgres, p.tableName)
-		p.sqlUpdateRow = fmt.Sprintf(sqlUpdateRowPostgres, p.tableName)
-		p.sqlDeleteRow = fmt.Sprintf(sqlDeleteRowPostgres, p.tableName)
-	case "mysql":
-		p.sqlCreateTable = fmt.Sprintf(sqlCreateTableMysql, p.tableName)
-	case "sqlite3":
-		p.sqlCreateTable = fmt.Sprintf(sqlCreateTableSqlite3, p.tableName)
-		p.sqlTruncateTable = fmt.Sprintf(sqlTruncateTableSqlite3, p.tableName)
-	case "sqlserver":
-		p.sqlCreateTable = fmt.Sprintf(sqlCreateTableSqlserver, p.tableName)
-		p.sqlInsertRow = fmt.Sprintf(sqlInsertRowSqlserver, p.tableName)
-		p.sqlUpdateRow = fmt.Sprintf(sqlUpdateRowSqlserver, p.tableName)
-		p.sqlDeleteRow = fmt.Sprintf(sqlDeleteRowSqlserver, p.tableName)
-	}
+	p.sqlSelectAll = fmt.Sprintf(sqlSelectAll, p.schemaName, p.tableName)
+	p.sqlSelectWhere = fmt.Sprintf(sqlSelectWhere, p.schemaName, p.tableName)
 }
 
 // createTable  create a not exists table.

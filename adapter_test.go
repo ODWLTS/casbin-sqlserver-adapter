@@ -1,3 +1,4 @@
+// Copyright 2021 by ODW LTS. All Rights Reserved.
 // Copyright 2020 by Blank-Xu. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// This file file has been modified by ODW LTS to improve SQL Server support.
 
 package sqlxadapter
 
@@ -22,23 +25,18 @@ import (
 	"github.com/casbin/casbin/v2/util"
 	"github.com/jmoiron/sqlx"
 
-	// _ "github.com/denisenkom/go-mssqldb"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
-	// _ "github.com/mattn/go-sqlite3"
+	_ "github.com/denisenkom/go-mssqldb"
 )
 
 const (
 	rbacModelFile  = "examples/rbac_model.conf"
 	rbacPolicyFile = "examples/rbac_policy.csv"
+	schemaName     = "TESTCASBIN"
 )
 
 var (
 	dataSourceNames = map[string]string{
-		// "sqlite3":  ":memory:",
-		"mysql":    "root:@tcp(127.0.0.1:3306)/sqlx_adapter_test",
-		"postgres": "user=postgres host=127.0.0.1 port=5432 dbname=sqlx_adapter_test sslmode=disable",
-		// "sqlserver": "sqlserver://sa:YourPassword@127.0.0.1:1433?database=sqlx_adapter_test&connection+timeout=30",
+		"sqlserver": "sqlserver://sa:OdwLts1580!@127.0.0.1:1433?database=TMS&connection+timeout=30",
 	}
 
 	lines = []CasbinRule{
@@ -73,49 +71,102 @@ func TestAdapters(t *testing.T) {
 			t.Fatalf("sqlx.Connect failed, err: %v", err)
 		}
 
+		_, err = db.Exec("DROP SCHEMA IF EXISTS " + schemaName)
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop schema failed, err: %v", err)
+		}
+		_, err = db.Exec("CREATE SCHEMA " + schemaName)
+		if err != nil {
+			t.Fatalf("sqlx.Exec create schema failed, err: %v", err)
+		}
+
 		t.Log("---------- testTableName start")
 		testTableName(t, db)
+
+		_, err = db.Exec("DROP TABLE " + defaultSchemaName + "." + defaultTableName)
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testTableName finished")
 
 		t.Log("---------- testSQL start")
-		testSQL(t, db, "sqlxadapter_sql")
+		testSQL(t, db, schemaName, "sqlxadapter_sql")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqlxadapter_sql")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testSQL finished")
 
 		t.Log("---------- testSaveLoad start")
-		testSaveLoad(t, db, "sqlxadapter_save_load")
+		testSaveLoad(t, db, schemaName, "sqlxadapter_save_load")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqlxadapter_save_load")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testSaveLoad finished")
 
 		t.Log("---------- testAutoSave start")
-		testAutoSave(t, db, "sqlxadapter_auto_save")
+		testAutoSave(t, db, schemaName, "sqlxadapter_auto_save")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqlxadapter_auto_save")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testAutoSave finished")
 
 		t.Log("---------- testFilteredPolicy start")
-		testFilteredPolicy(t, db, "sqlxadapter_filtered_policy")
+		testFilteredPolicy(t, db, schemaName, "sqlxadapter_filtered_policy")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqlxadapter_filtered_policy")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testFilteredPolicy finished")
 
 		t.Log("---------- testUpdatePolicy start")
-		testUpdatePolicy(t, db, "sqladapter_filtered_policy")
+		testUpdatePolicy(t, db, schemaName, "sqladapter_filtered_policy")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqladapter_filtered_policy")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testUpdatePolicy finished")
 
 		t.Log("---------- testUpdatePolicies start")
-		testUpdatePolicies(t, db, "sqladapter_filtered_policy")
+		testUpdatePolicies(t, db, schemaName, "sqladapter_filtered_policy")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqladapter_filtered_policy")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testUpdatePolicies finished")
 
 		t.Log("---------- testUpdateFilteredPolicies start")
-		testUpdateFilteredPolicies(t, db, "sqladapter_filtered_policy")
+		testUpdateFilteredPolicies(t, db, schemaName, "sqladapter_filtered_policy")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqladapter_filtered_policy")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
 		t.Log("---------- testUpdateFilteredPolicies finished")
 
+		_, err = db.Exec("DROP SCHEMA IF EXISTS " + schemaName)
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop schema failed, err: %v", err)
+		}
 	}
 }
 
 func testTableName(t *testing.T, db *sqlx.DB) {
-	_, err := NewAdapter(db, "")
+	_, err := NewAdapter(db, "", "")
 	if err != nil {
 		t.Fatalf("NewAdapter failed, err: %v", err)
 	}
 }
 
-func testSQL(t *testing.T, db *sqlx.DB, tableName string) {
+func testSQL(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	var err error
 	logErr := func(action string) {
 		if err != nil {
@@ -137,7 +188,7 @@ func testSQL(t *testing.T, db *sqlx.DB, tableName string) {
 	}
 
 	var a *Adapter
-	a, err = NewAdapter(db, tableName)
+	a, err = NewAdapter(db, schemaName, tableName)
 	logErr("NewAdapter")
 
 	// createTable test has passed when adapter create
@@ -191,12 +242,12 @@ func testSQL(t *testing.T, db *sqlx.DB, tableName string) {
 	logErr("truncateTable")
 }
 
-func initPolicy(t *testing.T, db *sqlx.DB, tableName string) {
+func initPolicy(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Because the DB is empty at first,
 	// so we need to load the policy from the file adapter (.CSV) first.
 	e, _ := casbin.NewEnforcer(rbacModelFile, rbacPolicyFile)
 
-	a, err := NewAdapter(db, tableName)
+	a, err := NewAdapter(db, schemaName, tableName)
 	if err != nil {
 		t.Fatal("NewAdapter test failed, err: ", err)
 	}
@@ -221,30 +272,30 @@ func initPolicy(t *testing.T, db *sqlx.DB, tableName string) {
 	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}})
 }
 
-func testSaveLoad(t *testing.T, db *sqlx.DB, tableName string) {
+func testSaveLoad(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Initialize some policy in DB.
-	initPolicy(t, db, tableName)
+	initPolicy(t, db, schemaName, tableName)
 	// Note: you don't need to look at the above code
 	// if you already have a working DB with policy inside.
 
 	// Now the DB has policy, so we can provide a normal use case.
 	// Create an adapter and an enforcer.
 	// NewEnforcer() will load the policy automatically.
-	a, _ := NewAdapter(db, tableName)
+	a, _ := NewAdapter(db, schemaName, tableName)
 	e, _ := casbin.NewEnforcer(rbacModelFile, a)
 	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}})
 }
 
-func testAutoSave(t *testing.T, db *sqlx.DB, tableName string) {
+func testAutoSave(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Initialize some policy in DB.
-	initPolicy(t, db, tableName)
+	initPolicy(t, db, schemaName, tableName)
 	// Note: you don't need to look at the above code
 	// if you already have a working DB with policy inside.
 
 	// Now the DB has policy, so we can provide a normal use case.
 	// Create an adapter and an enforcer.
 	// NewEnforcer() will load the policy automatically.
-	a, _ := NewAdapter(db, tableName)
+	a, _ := NewAdapter(db, schemaName, tableName)
 	e, _ := casbin.NewEnforcer(rbacModelFile, a)
 
 	// AutoSave is enabled by default.
@@ -320,16 +371,16 @@ func testAutoSave(t *testing.T, db *sqlx.DB, tableName string) {
 	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}})
 }
 
-func testFilteredPolicy(t *testing.T, db *sqlx.DB, tableName string) {
+func testFilteredPolicy(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Initialize some policy in DB.
-	initPolicy(t, db, tableName)
+	initPolicy(t, db, schemaName, tableName)
 	// Note: you don't need to look at the above code
 	// if you already have a working DB with policy inside.
 
 	// Now the DB has policy, so we can provide a normal use case.
 	// Create an adapter and an enforcer.
 	// NewEnforcer() will load the policy automatically.
-	a, _ := NewAdapter(db, tableName)
+	a, _ := NewAdapter(db, schemaName, tableName)
 	e, _ := casbin.NewEnforcer(rbacModelFile, a)
 	// Now set the adapter
 	e.SetAdapter(a)
@@ -369,11 +420,11 @@ func testFilteredPolicy(t *testing.T, db *sqlx.DB, tableName string) {
 	testGetPolicy(t, e, [][]string{{"bob", "data1", "write", "test1", "test2", "test3"}})
 }
 
-func testUpdatePolicy(t *testing.T, db *sqlx.DB, tableName string) {
+func testUpdatePolicy(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Initialize some policy in DB.
-	initPolicy(t, db, tableName)
+	initPolicy(t, db, schemaName, tableName)
 
-	a, _ := NewAdapter(db, tableName)
+	a, _ := NewAdapter(db, schemaName, tableName)
 	e, _ := casbin.NewEnforcer(rbacModelFile, a)
 
 	e.EnableAutoSave(true)
@@ -382,11 +433,11 @@ func testUpdatePolicy(t *testing.T, db *sqlx.DB, tableName string) {
 	testGetPolicy(t, e, [][]string{{"alice", "data1", "write"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}})
 }
 
-func testUpdatePolicies(t *testing.T, db *sqlx.DB, tableName string) {
+func testUpdatePolicies(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Initialize some policy in DB.
-	initPolicy(t, db, tableName)
+	initPolicy(t, db, schemaName, tableName)
 
-	a, _ := NewAdapter(db, tableName)
+	a, _ := NewAdapter(db, schemaName, tableName)
 	e, _ := casbin.NewEnforcer(rbacModelFile, a)
 
 	e.EnableAutoSave(true)
@@ -395,11 +446,11 @@ func testUpdatePolicies(t *testing.T, db *sqlx.DB, tableName string) {
 	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}, {"bob", "data2", "read"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}})
 }
 
-func testUpdateFilteredPolicies(t *testing.T, db *sqlx.DB, tableName string) {
+func testUpdateFilteredPolicies(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	// Initialize some policy in DB.
-	initPolicy(t, db, tableName)
+	initPolicy(t, db, schemaName, tableName)
 
-	a, _ := NewAdapter(db, tableName)
+	a, _ := NewAdapter(db, schemaName, tableName)
 	e, _ := casbin.NewEnforcer(rbacModelFile, a)
 
 	e.EnableAutoSave(true)
