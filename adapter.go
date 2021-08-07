@@ -85,6 +85,25 @@ type Filter struct {
 	V5    []string
 }
 
+// V0IncludeV2ExcludeFilter defines the filtering include and exclude rules for
+// a FilteredAdapter's policy.
+type IncludeExcludeFilter struct {
+	PTypeInclude []string
+	PTypeExclude []string
+	V0Include    []string
+	V0Exclude    []string
+	V1Include    []string
+	V1Exclude    []string
+	V2Include    []string
+	V2Exclude    []string
+	V3Include    []string
+	V3Exclude    []string
+	V4Include    []string
+	V4Exclude    []string
+	V5Include    []string
+	V5Exclude    []string
+}
+
 // NewAdapter  the constructor for Adapter.
 // db should connected to database and controlled by user.
 // If tableName == "", the Adapter will automatically create a table named "casbin_rule".
@@ -324,6 +343,86 @@ func (p *Adapter) selectWhereIn(filter *Filter) (lines []*CasbinRule, err error)
 	return p.selectRows(query, args...)
 }
 
+// selectWhereInNotIn select eligible data by filter from the table.
+func (p *Adapter) selectWhereInNotIn(filter *IncludeExcludeFilter) (lines []*CasbinRule, err error) {
+	var sqlBuf bytes.Buffer
+
+	sqlBuf.Grow(64)
+	sqlBuf.WriteString(p.sqlSelectWhere)
+
+	args := make([]interface{}, 0, 4)
+
+	hasInCond := false
+
+	for _, col := range [maxParamLength * 2]struct {
+		name    string
+		include bool
+		arg     []string
+	}{
+		{"p_type", true, filter.PTypeInclude},
+		{"v0", true, filter.V0Include},
+		{"v1", true, filter.V1Include},
+		{"v2", true, filter.V2Include},
+		{"v3", true, filter.V3Include},
+		{"v4", true, filter.V4Include},
+		{"v5", true, filter.V5Include},
+		{"p_type", false, filter.PTypeExclude},
+		{"v0", false, filter.V0Exclude},
+		{"v1", false, filter.V1Exclude},
+		{"v2", false, filter.V2Exclude},
+		{"v3", false, filter.V3Exclude},
+		{"v4", false, filter.V4Exclude},
+		{"v5", false, filter.V5Exclude},
+	} {
+		l := len(col.arg)
+		if l == 0 {
+			continue
+		}
+
+		switch sqlBuf.Bytes()[sqlBuf.Len()-1] {
+		case '?', ')':
+			sqlBuf.WriteString(" AND ")
+		}
+
+		sqlBuf.WriteString(col.name)
+
+		if col.include {
+			if l == 1 {
+				sqlBuf.WriteString(" = ?")
+				args = append(args, col.arg[0])
+			} else {
+				sqlBuf.WriteString(" IN (?)")
+				args = append(args, col.arg)
+
+				hasInCond = true
+			}
+		} else {
+			if l == 1 {
+				sqlBuf.WriteString(" != ?")
+				args = append(args, col.arg[0])
+			} else {
+				sqlBuf.WriteString(" NOT IN (?)")
+				args = append(args, col.arg)
+
+				hasInCond = true
+			}
+		}
+
+	}
+
+	var query string
+
+	if hasInCond {
+		if query, args, err = sqlx.In(sqlBuf.String(), args...); err != nil {
+			return
+		}
+	} else {
+		query = sqlBuf.String()
+	}
+
+	return p.selectRows(query, args...)
+}
+
 // LoadPolicy  load all policy rules from the storage.
 func (p *Adapter) LoadPolicy(model model.Model) error {
 	lines, err := p.selectRows(p.sqlSelectAll)
@@ -454,22 +553,38 @@ func (p *Adapter) LoadFilteredPolicy(model model.Model, filterPtr interface{}) e
 	}
 
 	filter, ok := filterPtr.(*Filter)
-	if !ok {
-		return errors.New("invalid filter type")
+	if ok {
+		lines, err := p.selectWhereIn(filter)
+		if err != nil {
+			return err
+		}
+
+		for _, line := range lines {
+			p.loadPolicyLine(line, model)
+		}
+
+		p.isFiltered = true
+
+		return nil
+	} else {
+		filterIncludeExclude, ok := filterPtr.(*IncludeExcludeFilter)
+		if !ok {
+			return errors.New("invalid filter type")
+		}
+
+		lines, err := p.selectWhereInNotIn(filterIncludeExclude)
+		if err != nil {
+			return err
+		}
+
+		for _, line := range lines {
+			p.loadPolicyLine(line, model)
+		}
+
+		p.isFiltered = true
+
+		return nil
 	}
-
-	lines, err := p.selectWhereIn(filter)
-	if err != nil {
-		return err
-	}
-
-	for _, line := range lines {
-		p.loadPolicyLine(line, model)
-	}
-
-	p.isFiltered = true
-
-	return nil
 }
 
 // IsFiltered  returns true if the loaded policy rules has been filtered.
@@ -562,44 +677,51 @@ func (p *Adapter) UpdateFilteredPolicies(sec, ptype string, newPolicies [][]stri
 	value = p.db.Rebind(deleteBuf.String())
 	if _, err = tx.ExecContext(p.ctx, value, whereArgs...); err != nil {
 		action = "delete old policies"
-		goto ROLLBACK
+		if err1 := tx.Rollback(); err1 != nil {
+			err = fmt.Errorf("%s err: %v, rollback err: %v", action, err, err1)
+			return
+		}
 	}
 
 	stmt, err = tx.PreparexContext(p.ctx, p.sqlInsertRow)
 	if err != nil {
 		action = "preparex context"
-		goto ROLLBACK
+		if err1 := tx.Rollback(); err1 != nil {
+			err = fmt.Errorf("%s err: %v, rollback err: %v", action, err, err1)
+			return
+		}
 	}
 
 	for _, policy := range newPolicies {
 		arg := p.genArgs(ptype, policy)
 		if _, err = stmt.ExecContext(p.ctx, arg...); err != nil {
 			action = "stmt exec context"
-			goto ROLLBACK
+			if err1 := tx.Rollback(); err1 != nil {
+				err = fmt.Errorf("%s err: %v, rollback err: %v", action, err, err1)
+				return
+			}
 		}
 	}
 
 	if err = stmt.Close(); err != nil {
 		action = "stmt close"
-		goto ROLLBACK
+		if err1 := tx.Rollback(); err1 != nil {
+			err = fmt.Errorf("%s err: %v, rollback err: %v", action, err, err1)
+			return
+		}
 	}
 
 	if err = tx.Commit(); err != nil {
 		action = "commit"
-		goto ROLLBACK
+		if err1 := tx.Rollback(); err1 != nil {
+			err = fmt.Errorf("%s err: %v, rollback err: %v", action, err, err1)
+			return
+		}
 	}
 
 	oldPolicies = make([][]string, 0, len(oldRows))
 	for _, rule := range oldRows {
 		oldPolicies = append(oldPolicies, []string{rule.PType, rule.V0, rule.V1, rule.V2, rule.V3, rule.V4, rule.V5})
-	}
-
-	return
-
-ROLLBACK:
-
-	if err1 := tx.Rollback(); err1 != nil {
-		err = fmt.Errorf("%s err: %v, rollback err: %v", action, err, err1)
 	}
 
 	return

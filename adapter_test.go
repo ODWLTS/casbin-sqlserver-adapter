@@ -125,6 +125,15 @@ func TestAdapters(t *testing.T) {
 		}
 		t.Log("---------- testFilteredPolicy finished")
 
+		t.Log("---------- testFilteredIncludeExcludePolicy start")
+		testFilteredIncludeExcludePolicy(t, db, schemaName, "sqlxadapter_filteredIncludeExclude_policy")
+
+		_, err = db.Exec("DROP TABLE " + schemaName + "." + "sqlxadapter_filteredIncludeExclude_policy")
+		if err != nil {
+			t.Fatalf("sqlx.Exec drop table failed, err: %v", err)
+		}
+		t.Log("---------- testFilteredPolicyIncludeExclude finished")
+
 		t.Log("---------- testUpdatePolicy start")
 		testUpdatePolicy(t, db, schemaName, "sqladapter_filtered_policy")
 
@@ -418,6 +427,70 @@ func testFilteredPolicy(t *testing.T, db *sqlx.DB, schemaName, tableName string)
 	err = e.LoadFilteredPolicy(&filter)
 	logErr("LoadFilteredPolicy filter")
 	testGetPolicy(t, e, [][]string{{"bob", "data1", "write", "test1", "test2", "test3"}})
+}
+
+func testFilteredIncludeExcludePolicy(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
+	// Initialize some policy in DB.
+	initPolicy(t, db, schemaName, tableName)
+	// Note: you don't need to look at the above code
+	// if you already have a working DB with policy inside.
+
+	// Now the DB has policy, so we can provide a normal use case.
+	// Create an adapter and an enforcer.
+	// NewEnforcer() will load the policy automatically.
+	a, _ := NewAdapter(db, schemaName, tableName)
+	e, _ := casbin.NewEnforcer(rbacModelFile, a)
+	// Now set the adapter
+	e.SetAdapter(a)
+
+	var err error
+	logErr := func(action string) {
+		if err != nil {
+			t.Errorf("%s test failed, err: %v", action, err)
+		}
+	}
+
+	// Load only alice's policies
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Include: []string{"alice"}})
+	logErr("LoadFilteredPolicy alice")
+	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}})
+
+	// Load only bob's policies
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Include: []string{"bob"}})
+	logErr("LoadFilteredPolicy bob")
+	testGetPolicy(t, e, [][]string{{"bob", "data2", "write"}})
+
+	// Load policies for data2_admin
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Include: []string{"data2_admin"}})
+	logErr("LoadFilteredPolicy data2_admin")
+	testGetPolicy(t, e, [][]string{{"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}})
+
+	// Load policies for alice and bob
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Include: []string{"alice", "bob"}})
+	logErr("LoadFilteredPolicy alice bob")
+	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}})
+
+	// Load policies for alice by excluding bob
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Exclude: []string{"bob"}})
+	logErr("LoadFilteredPolicy alice")
+	testGetPolicy(t, e, [][]string{{"alice", "data1", "read"}})
+
+	_, err = e.AddPolicy("basic", "load", "read")
+	logErr("AddPolicy")
+	_, err = e.AddPolicy("basic", "load", "write")
+	logErr("AddPolicy")
+	_, err = e.AddPolicy("advanced", "load", "action1")
+	logErr("AddPolicy")
+	_, err = e.AddPolicy("advanced", "entity1", "fieldexclude", "sensitivefield")
+	logErr("AddPolicy")
+
+	_, err = e.AddGroupingPolicy("user1", "basic")
+	_, err = e.AddGroupingPolicy("user1", "advanced")
+
+	// Load policies for alice by excluding bob
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Exclude: []string{"bob", "alice"}, V0Include: []string{"basic", "advanced"}, V2Exclude: []string{"fieldexclude"}})
+	logErr("LoadFilteredPolicy alice")
+	testGetPolicy(t, e, [][]string{{"basic", "load", "read"}, {"basic", "load", "write"}, {"advanced", "load", "action1"}})
 }
 
 func testUpdatePolicy(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
