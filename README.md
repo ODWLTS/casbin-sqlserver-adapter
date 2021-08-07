@@ -1,4 +1,4 @@
-# sqlx-adapter
+# casbin-sqlserver-adapter
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/odwlts/casbin-sqlserver-adapter)](https://goreportcard.com/report/github.com/odwlts/casbin-sqlserver-adapter)
 [![Coverage Status](https://coveralls.io/repos/github/odwlts/casbin-sqlserver-adapter/badge.svg?branch=master)](https://coveralls.io/github/odwlts/casbin-sqlserver-adapter?branch=master)
@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ---
 
-sqlx-adapter is a [Sqlx](https://github.com/jmoiron/sqlx) Adapter targeting [github.com/denisenkom/go-mssqldb](https://github.com/denisenkom/go-mssqldb) for [Casbin V2](https://github.com/casbin/casbin). 
+casbin-sqlserver-adapter is a [Sqlx](https://github.com/jmoiron/sqlx) Adapter targeting [github.com/denisenkom/go-mssqldb](https://github.com/denisenkom/go-mssqldb) for [Casbin V2](https://github.com/casbin/casbin). 
 
 With this library, Casbin can load policy lines from Sqlx supported databases or save policy lines.
 
