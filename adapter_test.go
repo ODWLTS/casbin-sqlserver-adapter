@@ -488,7 +488,7 @@ func testFilteredIncludeExcludePolicy(t *testing.T, db *sqlx.DB, schemaName, tab
 	_, err = e.AddGroupingPolicy("user1", "advanced")
 
 	// Load policies for alice by excluding bob
-	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Exclude: []string{"bob", "alice"}, V0Include: []string{"basic", "advanced"}, V2Exclude: []string{"fieldexclude"}})
+	err = e.LoadFilteredPolicy(&IncludeExcludeFilter{V0Exclude: []string{"bob", "alice"}, V0Include: []string{"user1", "basic", "advanced"}, V2Exclude: []string{"fieldexclude"}})
 	logErr("LoadFilteredPolicy alice")
 	testGetPolicy(t, e, [][]string{{"basic", "load", "read"}, {"basic", "load", "write"}, {"advanced", "load", "action1"}})
 }
