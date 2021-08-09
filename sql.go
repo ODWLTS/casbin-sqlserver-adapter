@@ -35,8 +35,8 @@ CREATE INDEX idx_%[2]s ON %[1]s.%[2]s (p_type, v0, v1);`
 	sqlSelectAll     = "SELECT p_type,v0,v1,v2,v3,v4,v5 FROM %s.%s"
 	sqlSelectWhere   = "SELECT p_type,v0,v1,v2,v3,v4,v5 FROM %s.%s WHERE "
 	sqlInsertRow     = "INSERT INTO %s.%s (p_type,v0,v1,v2,v3,v4,v5) VALUES (?,?,?,?,?,?,?)"
-	sqlUpdateRow     = "UPDATE %s.%s SET p_type=@p1,v0=@p2,v1=@p3,v2=@p4,v3=@p5,v4=@p6,v5=@p7 WHERE p_type=@p8 AND v0=@p9 AND v1=@p10 AND v2=@p11 AND v3=@p12 AND v4=@p13 AND v5=@p14"
-	sqlDeleteRow     = "DELETE FROM %s.%s WHERE p_type=@p1 AND v0=@p2 AND v1=@p3 AND v2=@p4 AND v3=@p5 AND v4=@p6 AND v5=@p7"
+	sqlUpdateRow     = "UPDATE %s.%s SET p_type=?,v0=?,v1=?,v2=?,v3=?,v4=?,v5=? WHERE p_type=? AND v0=? AND v1=? AND v2=? AND v3=? AND v4=? AND v5=?"
+	sqlDeleteRow     = "DELETE FROM %s.%s WHERE p_type=? AND v0=? AND v1=? AND v2=? AND v3=? AND v4=? AND v5=?"
 	sqlDeleteAll     = "DELETE FROM %s.%s"
 	sqlDeleteByArgs  = "DELETE FROM %s.%s WHERE p_type=?"
 )

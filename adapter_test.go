@@ -36,7 +36,7 @@ const (
 
 var (
 	dataSourceNames = map[string]string{
-		"sqlserver": "sqlserver://sa:OdwLts1580!@127.0.0.1:1433?database=TMS&connection+timeout=30",
+		"mssql": "sqlserver://sa:OdwLts1580!@127.0.0.1:1433?database=TMS&connection+timeout=30",
 	}
 
 	lines = []CasbinRule{
@@ -217,7 +217,7 @@ func testSQL(t *testing.T, db *sqlx.DB, schemaName, tableName string) {
 	logErr("truncateAndInsertRows")
 
 	err = a.deleteAllAndInsertRows(rules)
-	logErr("truncateAndInsertRows")
+	logErr("deleteAllAndInsertRows")
 
 	err = a.deleteRows(a.sqlDeleteByArgs, "g")
 	logErr("deleteRows sqlDeleteByArgs g")
