@@ -461,7 +461,7 @@ func (p *Adapter) SavePolicy(model model.Model) error {
 // AddPolicy  add one policy rule to the storage.
 func (p *Adapter) AddPolicy(sec string, ptype string, rule []string) error {
 	args := p.genArgs(ptype, rule)
-
+	fmt.Printf("query: %s, %#v", p.sqlInsertRow, args)
 	_, err := p.db.ExecContext(p.ctx, p.sqlInsertRow, args...)
 
 	return err
