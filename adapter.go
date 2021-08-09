@@ -15,7 +15,7 @@
 //
 // This file file has been modified by ODW LTS to improve SQL Server support.
 
-package sqlxadapter
+package casbinsqlserveradapter
 
 import (
 	"bytes"
